@@ -1,0 +1,180 @@
+---
+title: "Project_Relationship between Food Consumption Patterns and Nutritional Status in France"
+output: pdf_document
+Author: "DoHyun Seo"
+date: "2023-11-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+##Library
+```{r install library, message=FALSE, results='hide'}
+install.packages("FactoMineR", repos = "https://cran.r-project.org")
+install.packages("factoextra", repos = "https://cran.r-project.org")
+install.packages("cluster", repos = "https://cran.r-project.org")
+library(FactoMineR)
+library(factoextra)
+library(dplyr)
+library(tidyverse)
+library(gtsummary)
+library(cluster)
+library(epiDisplay)
+```
+
+## Load data
+```{r load data}
+inca <- read.csv("inca2_survey.csv", header = T, sep=",", dec = ".")
+```
+
+##Data Management
+Recode variable
+```{r bmi into binary (not overweight vs overweight)}
+inca$bmi_bin <- ifelse(inca$bmiclass<3, 0, 1)
+inca$bmi_bin <- factor(inca$bmi_bin, levels = c(0,1), labels=c("Not overweight","Overweight"))
+```
+
+```{r smoking into binary (smoking vs not smoking)}
+inca$smoking_bin <- ifelse(inca$smoking_status<3, 1, 0)
+inca$smoking_bin <- factor(inca$smoking_bin, levels = c(0,1), labels=c("Not smoking","Smoking"))
+```
+
+```{r education into binary (not university vs university)}
+inca$education_bin <- ifelse(inca$education<3, 0, 1)
+inca$education_bin <- factor(inca$education_bin, levels = c(0,1), labels=c("No university","University"))
+```
+
+Transform variable into factor
+```{r transform variable}
+inca$diet <- factor(inca$diet, levels = c(0,1), labels=c("No diet","Diet"))
+inca$disease <- factor(inca$disease, levels = c(0,1), labels=c("No CD","CD"))
+inca$season <- factor(inca$season, levels = c(1,2,3,4), labels=c("Winter","Spring","Summer","Autumn"))
+inca$age_categories <- factor(inca$age_categories, levels = c(1,2,3), labels=c("young adult","middle aged","elderly"))
+inca$ipaqnx <- factor(inca$ipaqnx, levels = c(1,2), labels=c("Normal PA","Sedentary"))
+inca$supplements <- factor(inca$supplements, levels = c(0,1), labels=c("No supplements","Supplements"))
+inca$income <- factor(inca$income, levels = c(1,2,3,4), labels=c("Low SES","Lower middle SES","Higher middle SES","High SES"))
+inca$household_4c <- factor(inca$household_4c, levels = c(1,2,3,4), labels=c("Single","Single parent","Couple no children","Couple with children"))
+```
+
+
+```{r clean data}
+inca_clean <- na.omit(inca)
+summary(inca_clean)
+```
+
+#Perform PCA
+Create subset
+```{r create subset}
+inca_pca <- inca_clean[,-c(1,3,4,7,8,51,52,55,56)]
+```
+
+```{r pca}
+res.pca <- PCA(inca_pca, scale.unit = T, ncp = 14, quali.sup= c(1,2,3,46,47), graph =F)
+```
+
+```{r choose dimensions}
+#Check eigen value
+res.pca$eig
+barplot(res.pca$eig[,1],main="eigenvalues",names.arg=1:nrow(res.pca$eig)) 
+fviz_eig(res.pca, addlabels = TRUE)
+#2 dimensions
+```
+
+#Individual result
+```{r individual contribution and coordinates, results = "hide"}
+res.pca$ind$contrib
+res.pca$ind$coord
+```
+
+```{r individual plot}
+fviz_pca_ind(res.pca, geom.ind="point",
+             col.ind=inca_pca$bmi_bin,
+             palette=c("blue","yellow"),
+             legend.title="Nutritional Status",
+             addEllipses = T,
+             title="Individual Plot based on Nutritional Status")
+```
+
+#Variable result
+```{r graph variable}
+fviz_pca_var(res.pca, axes=c(1,2), col.var="contrib",
+             gradient.cols=c("green","orange","pink"),
+             repel=T,
+             title="Correlation circle by distribution")
+```
+
+
+```{r variable contributions, results = "hide"}
+res.pca$var
+```
+
+```{r supplementary only}
+plot.PCA(res.pca, axes=c(1, 2), choix="ind", habillage = "none", invisible=c("ind"), new.plot=F, graph.type="classic")
+```
+
+##Clustering: HCA on PCA
+#2 clusters
+```{r perform HCA automatic}
+res.pca.hcpc <- HCPC(res.pca , nb.clust=-1, consol=T, min=2, max=10, graph=TRUE)
+```
+
+```{r plot 2 cluster}
+fviz_cluster(res.pca.hcpc)
+```
+
+#3 clusters
+```{r perform HCA 3 clusters}
+res.pca.hcpc3 <- HCPC(res.pca , nb.clust=3, consol=T, min=2, max=10, graph=TRUE)
+```
+
+```{r plot 3 cluster}
+fviz_cluster(res.pca.hcpc3) #Choose 3 clusters
+```
+
+#Add cluster to dataset
+```{r add cluster to dataset}
+#3 clusters
+inca.cluster.data <- cbind.data.frame(inca_clean, res.pca.hcpc3$data.clust$clust)
+names(inca.cluster.data)[names(inca.cluster.data) == "res.pca.hcpc3$data.clust$clust"] <- "cluster3"
+```
+
+#describe cluster
+```{r cluster 3 describe, results = "hide"}
+res.pca.hcpc3$desc.var$quanti #clusters described by the quantitative active variables. 
+
+res.pca.hcpc3$desc.var$category #clusters described by the illustrative qualitative variables.
+
+res.pca.hcpc3$desc.var$test.chi2 #disease is significant, change outcome to disease
+```
+
+
+```{r cluster 3}
+#check chi square between 
+chisq.test(inca.cluster.data$bmi_bin, inca.cluster.data$cluster3) #p-value 4.45x10^-13
+```
+
+```{r descriptive graph}
+inca_descriptive <- inca.cluster.data[,-c(4,8,9:50, 52)]
+colnames(inca_descriptive) <-c('Diet','Chronic Disease','Season','Age category','Income Level','Physical Activity','Supplement Consumption','Household Category','Nutritional Status', 'Smoking','Education','Cluster')
+
+inca_descriptive %>% tbl_summary(by = Cluster) %>% add_p() %>% modify_spanning_header(c("stat_1", "stat_2","stat_3") ~ "**Cluster**") %>% as_gt()
+```
+
+## Multivariate Regression
+
+Run bivariate analysis between clusters, other confonding variables, against nutritional status.
+```{r bivariate}
+inca_regression <- inca_descriptive[,-c(1,3,7,8)]
+inca_regression %>% tbl_summary(by = `Nutritional Status`) %>% add_p() %>% modify_spanning_header(c("stat_1", "stat_2") ~ "**Nutritional Status**") %>% as_gt()
+```
+
+```{r logistic regression}
+inca_regression$`Chronic Disease` <- relevel(inca_regression$`Chronic Disease`, ref="No CD")
+inca_model <- glm(data=inca_regression, `Nutritional Status`~`Cluster`+`Age category`+`Smoking`+`Chronic Disease`+`Education`+`Physical Activity`, family=binomial(link="logit"))
+summary(inca_model)
+
+tbl_regression(inca_model, exponentiate = T) %>% as_gt()
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
