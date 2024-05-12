@@ -1,0 +1,269 @@
+---
+title: "PCA Lab - module 214"
+format: html
+editor: visual
+---
+
+## install and load packages
+
+Please make sure that all the following package are properly installed and loaded
+
+```{r import}
+#| echo: true
+#| eval: true
+#| warning: false
+#| message: false
+
+# install.packages(c("FactoMineR", "factoextra", "foreign","dplyr", "gtsummary))
+
+library(foreign)
+library(FactoMineR)
+library(factoextra)
+library(dplyr)
+library(corrplot)
+library(gtsummary)
+```
+
+## 1. Data importation and description
+
+### 1.1 Importation
+
+Note if you are not using an R project, you have set your directory using:
+
+```{r setting_directory}
+
+# setwd("my directory") 
+
+```
+
+If you are using a R project, you can avoid this step and call your `hemo` "data"
+
+```{r data_selection}
+#| echo: true
+hemo <- read.table("DATA/hemo.txt", header =T, sep = "", dec = ".")
+
+head(hemo)
+
+```
+
+### 1.2 Verify data importation
+
+Several options are available to check that your data were imported properly
+
+```{r check_importation}
+
+names(hemo) # list variables in the database
+dim(hemo) # return number of observations and variables
+str(hemo) # describe the type of variables and structure (useful to check factor and numerical variables)
+summary(hemo) # describe the type of variable and descriptive stats
+
+```
+
+There are 5 qualitative variables that have to be recoded
+
+```{r}
+
+hemo$hepatomegalie <- as.factor(hemo$hepatomegalie)
+hemo$insuffisance_hepato_cellulaire <- as.factor(hemo$insuffisance_hepato_cellulaire)
+hemo$recodcir <- as.factor(hemo$recodcir)
+hemo$sexe <- as.factor(hemo$sexe)
+hemo$alcoolisme <- as.factor(hemo$alcoolisme)
+
+
+
+```
+
+### 1.3 Description of quantitative variables (with package dplyr and gtsummary)
+
+```{r}
+
+hemo %>% tbl_summary()
+
+
+#hemo %>% summarise("nage"=length(agediag),"avage"=mean(agediag), "sdage"=sd(agediag))
+#hemo %>% summarise("nAST"=length(ast), "avAST"= mean(ast),"sdAST"= sd(ast))
+#hemo %>% summarise("nALT"=length(alt), "avALT"= mean(alt),"sdALT"= sd(alt))
+#hemo %>% summarise("nGGT"=length(ggt), "avGGT"= mean(ggt),"sdGGT"= sd(ggt))
+#hemo %>% summarise("nFER"=length(fer), "avFER"= mean(fer),"sdFER"= sd(fer))
+#hemo %>% summarise("nCS"=length(cs), "avCS"= mean(cs),"sdCS"= sd(cs))
+#hemo %>% summarise("nFRT"=length(frt), "avFRT"= mean(frt),"sdFRT"= sd(frt))
+#hemo %>% summarise("nCHFAGE"=length(chfage), "avCHFAGE"= mean(chfage),"sdCHFAGE"= sd(chfage))
+#hemo %>% summarise("nBMI"=length(bmi), "avBMI"= mean(bmi),"sdBMI"= sd(bmi))
+
+```
+
+```{r}
+#alternative : -> description of quantitative variables use apply function(mean & SD)
+
+#data.des <- data.frame(hemo[,c(6:10)])
+#apply(data.des,2, mean)
+#apply(data.des,2, sd)
+
+#summary(data.des)
+
+# -> description of qualitative variables
+
+#prop.table(table(hemo$hepatomegalie))*100
+#prop.table(table(hemo$insuffisance_hepato_cellulaire))*100
+#prop.table(table(hemo$recodcir))*100
+#prop.table(table(hemo$alcoolisme))*100
+#prop.table(table(hemo$sexe))*100
+
+```
+
+# 2. Performing a PCA
+
+## 2.1 Selection of variables to input in PCA
+
+The active variables are the variables that could be easily collected during clinic "agediag", "AST", "ALT", "GGT", "FER", "CS", "FRT", "CHFAGE", "BMI"
+
+Illustrative variable is the diagnosis of cirrhosis (recodcir)
+
+The qualitative variable could have been used as active variables (as a research point of view)but since PCA only include quantitative variables it was not possible. Put the other qualitative variables (alcoolisme, sexe, hepatomegalie and nsuffisance_hepato_cellulaire) as illustrative variable to be able to see their projections)
+
+```{r}
+hemo.PCA<-hemo[, c("agediag", "ast", "alt", "ggt", "fer", "cs", "frt", 
+                       "chfage", "bmi", "recodcir","alcoolisme", "sexe")]
+```
+
+## 2.2 Perfom a PCA
+
+Use the PCA function on the selection of variables `hemo.PCA`, and put `graph=FALSE` IF you don't want to display the graphs automatically. The results of the PCA (eigvalues, coordinates, contributions, cos2) will be available on the res.pca.
+
+```{r}
+
+res.pca <- PCA(hemo.PCA, scale.unit = T, ncp = 5, quali.sup = 10:12, graph = F)
+
+#scale.unit = T means that data are standardized
+#ncp = 5 : results on the 5 first dimensions
+#graph = T/F : print or not the graphics of individuals and correlation circle
+#quali.sup : notify the illustrative variables 
+
+  # -> Show eigenvalues
+
+res.pca$eig
+
+  #  -> calculate sum of eigenvalues (= number actives variables used for your PCA)
+
+eigenvalue <-data.frame(round(res.pca$eig[,1],2)) 
+sum.eig <- apply(eigenvalue, 2, sum)
+sum.eig
+
+
+  # -> Screeplot via factoextra
+
+fviz_eig(res.pca, addlabels = TRUE)
+
+
+```
+
+# 3 Interpreting a PCA
+
+## 3.1 Plot the graph of individuals
+
+There is several ways to plot the results of a PCA. - You can use the plot function , use the invisible option to be able to see the illustrative qualitative variables -axes= c(1,2) : select the dimensions to be display (here dim 1 & dim 2)
+
+```{r}
+
+par(mfrow = c(1, 2)) # to plot the graphic of individuals and variables side by side
+
+
+
+plot(res.pca, axes=c(1, 2), choix="ind", 
+         habillage="none", col.ind="black", col.ind.sup="blue", 
+         col.quali="magenta", label=c("ind", "ind.sup", "quali"), 
+         new.plot=F, graph.type = "classic")
+
+
+plot(res.pca, axes=c(1, 2), choix="ind", 
+         habillage="none", col.ind="black", col.ind.sup="blue", 
+         col.quali="magenta", label=c("ind", "ind.sup", "quali"), invisible = c("ind"),
+         new.plot=F, graph.type = "classic")
+grid()
+
+
+grid()
+par(mfrow = c(1, 1))
+
+```
+
+You can also use (better) used fviz_pca_ind function from the factoextra package
+
+```{r}
+fviz_pca_ind(res.pca)
+fviz_pca_ind(res.pca,
+             geom.ind = "point", #point not number of individuals 
+             col.ind = hemo$recodcir, # color according to diagnosis of cirrhosis
+             palette = c("#00AFBB", "#E7B800"),
+             legend.title = "Cirrhosis",
+             addEllipses = T, # Concentration ellipses
+             title="Graphic of individuals following a diagnosis of cirrhosis"
+)
+```
+
+## 3.2 Use numerical outputs of individuals
+
+All results are stored in the res.pca.ind. Their can be export using the write.csv2 function. By default, the results of the individuals (coordinates, contributions, cos) will be displayed on the 5 first dimensions. To have the results on a higher number of dimensions, you have to change the option ncp = X in the PCA function. For example, if you want the results of of the individuals on the 10 first dimensions, you have to specify ncp =10 in the PCA function above.
+
+```{r}
+res.pca$ind$contrib
+res.pca$ind$coord
+
+  # -> export numerical outputs (coordinates, contributions, square cosines)
+
+output.ind= cbind.data.frame(hemo[,1],round(res.pca$ind$coord[,1:3],2), round(res.pca$ind$contrib[,1:3],2), round(res.pca$ind$cos2[,1:3],2))
+write.csv2(output.ind, file ="hemo_pca_resind.csv")
+```
+
+## 3.3 Plot the graph of variables
+
+```{r}
+plot(res.pca, axes=c(2, 3), choix="var", new.plot=TRUE,
+         col.var="black", col.quanti.sup="blue", label=c("var", "quanti.sup"), lim.cos2.var=0)
+
+
+#graphic of variables with (factoextra)
+
+fviz_pca_var(res.pca, col.var = "purple")
+
+#graphic of variables following contributions
+
+fviz_pca_var(res.pca, col.var = "contrib",
+             gradient.cols = c("#40e0d0", "#ff8c00", "#ff0080"),
+             repel = TRUE,# avoid text overlapping 
+             title="Correlation circle by contributions"
+)
+```
+
+## 3.4 Use numerical outputs of variables
+
+```{r}
+res.pca$var
+# variables numerical outputs (coordinates, contributions, square cosines)
+
+output.var= cbind.data.frame(round(res.pca$var$coord[,1:3],2), round(res.pca$var$contrib[,1:3],2), round(res.pca$var$cos2[,1:3],2))
+write.csv2(output.var, file ="hemo_pca_resvar.csv")
+
+#visualization variables contributing the most to the first dimension using factoextra
+
+fviz_contrib(res.pca, choice = "var", axes = 1, top = 6) #the 6 first variables contributing the most the  first factor
+
+
+```
+
+##3.5 Visualization of numerical output using corrplot package
+
+```{r}
+corrplot(res.pca$var$coord, is.corr=FALSE)
+corrplot(res.pca$var$contrib, is.corr=FALSE)
+corrplot(res.pca$var$cos2, is.corr=FALSE)
+
+```
+
+# 4. Interactive exploration of PCA using `explor` package
+
+```{r}
+library(explor)
+explor(res.pca)
+
+```

@@ -1,0 +1,165 @@
+---
+title: "Lab2_MCA"
+format: html
+editor: visual
+---
+
+# Load packages
+
+```{r}
+#| echo: true
+#| eval: true
+#| warning: false
+#| message: false
+#| 
+library(FactoMineR)
+library(factoextra)
+library(foreign)
+
+```
+
+# Data importation
+
+```{r}
+#| echo: true
+hemo <- read.table("hemo_quali.txt", header =T, sep = ",", dec = ".")
+
+```
+
+# Recoding variables as factors and adding labels to qualitatives variables
+
+```{r}
+#| echo: true
+hemo$recodcir <- factor(hemo$recodcir, levels =c("1","2"), labels = c("cir_yes", "cir_no"))
+hemo$alcoolisme <- factor(hemo$alcoolisme, levels =c("OH=1","OH=2"), labels = c("Alcohol_yes", "Alcohol_no"))
+hemo$hepatomegalie <- factor(hemo$hepatomegalie)
+hemo$insuffisance_hepato_cellulaire <- factor(hemo$insuffisance_hepato_cellulaire)
+
+hemo$alt_en_classes <- factor(hemo$alt_en_classes, levels = c("<0.84",">=0.84"), labels = c("low alanine", "high alanine"))
+hemo$ast_en_classes <- factor(hemo$ast_en_classes, levels = c("<0.67", ">=0.67"), labels = c("low aspart", "high aspart"))
+hemo$ggt_en_classes <- factor(hemo$ggt_en_classes, levels = c("<0.98", ">=0.98"),labels = c("low ggt", "high ggt"))
+hemo$bmi_en_classes <- factor(hemo$bmi_en_classes, levels = c("<23.84", ">=23.84"),labels = c("normal", "overweight"))
+hemo$agediag_en_classes <- factor(hemo$agediag_en_classes, levels = c("<46", ">=46"),labels = c("young", "old"))
+hemo$cs_en_classes <- factor(hemo$cs_en_classes, levels = c("<79", ">=79"),labels = c("Translow", "Transhigh"))
+hemo$chfage_en_classes <- factor(hemo$chfage_en_classes, levels = c("<7.36", ">=7.36"),labels = c("hepaticlow", "hepatichigh"))
+hemo$fer_en_classes <- factor(hemo$fer_en_classes, levels = c("<37", ">=37"),label = c("ironlow", "ironhigh"))
+```
+
+# Selection of active categorical variables and illustrative variables (recodcir)
+
+Choose all variables, except "ident"
+
+```{r}
+hemo.MCA<-subset(hemo,select = -ident)
+
+```
+
+# Perform a MCA
+
+Choose the diagnosis of cirrhosis as an illustrative variable. We can integrate all the other variables, including sex as active ones.
+
+```{r}
+res.mca<-MCA(hemo.MCA, ncp=3, quali.sup= 5,graph = F)
+
+```
+
+Observe the eigenvalues and the screeplot to choose the number of dimensions to interpret
+
+```{r}
+#| echo: true
+#| #| warning: false
+#| message: false
+res.mca$eig
+
+#the sum of eigen values must be = (K/J)-1
+eigenvalue <-data.frame(round(res.mca$eig[,1],2)) 
+sum.eig <- apply(eigenvalue, 2, sum)
+sum.eig
+
+fviz_screeplot(res.mca, addlabels = TRUE)
+# select the number of component to be interpreted
+
+```
+
+# Display the graphic of individuals and variables
+
+Biplot with factoextra = both individuals and categories of variables in the same graphic
+
+```{r}
+#| echo: true
+#| #| warning: false
+#| message: false
+#| 
+
+fviz_mca_biplot(res.mca)
+# use repel= TRUE option to avoid text overlapping (slow if many point)
+
+```
+
+Graphic only with categories of variables
+
+```{r}
+#| echo: true
+#| #| warning: false
+#| message: false
+
+#graphic with categories of variables only colored following their coordinates to dim 1
+
+fviz_mca_var(res.mca, col.var = "coord",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE, # Avoid text overlapping
+             ggtheme = theme_minimal())
+
+#graphic with categories of variables only colored following their contribution to dim 1
+
+fviz_mca_var(res.mca, col.var = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE, # Avoid text overlapping
+             ggtheme = theme_minimal())
+```
+
+Graphic only with individuals
+
+```{r}
+
+#graphic with individuals only colored following the illustrative variable "recodcir"
+#| echo: true
+#| #| warning: false
+#| message: false
+#| 
+fviz_mca_ind(res.mca,
+             geom.ind = "point", #point not number of individuals 
+             col.ind = hemo$recodcir, # color according to diagnosis of cirrhosis
+             palette = c("#00AFBB", "#E7B800"),
+             legend.title = "Cirrhosis",
+             addEllipses = T, # Concentration ellipses
+             title="Graphic of individuals following a diagnosis of cirrhosis"
+)
+```
+
+# Numerical outputs of individuals and variables
+
+In MCA, beyond contributions and coordinates, another indicator is available : the v-test parameter discriminates the categories of variables that are significantly contributing to the inertia of the dimension. its critical value is 2.0 (negative or positive). you should discard the contributions of the original variables that do not reach this value
+
+```{r}
+#the results of the individuals are available using the following commands
+res.mca$ind #present all indicators
+res.mca$ind$contrib #present only contributions
+res.mca$ind$coord #present only coordinates
+
+#the results of the categories of variables are available using the following commands
+res.mca$var  #present all indicators 
+res.mca$var$v.test #present only v-test
+res.mca$var$contrib #present only contributions
+res.mca$var$coord #present only coordinates
+
+```
+
+# Use explor to show the results of the MCA through an interactive platform
+
+```{r}
+
+library(explor)
+explor(res.mca)
+
+```

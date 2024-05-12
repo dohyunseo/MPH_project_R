@@ -1,0 +1,139 @@
+---
+title: "SSA_example"
+format: html
+editor: visual
+---
+
+# Load packages
+
+You need to install and load the package `TraMineR`and `cluster`. The data use for the example is the data available as an example in the package TraMineR
+
+```{r}
+
+#| echo: true
+#| eval: true
+#| warning: false
+#| message: false
+
+library(TraMineR)
+library(cluster)
+
+```
+
+# Load data
+
+```{r}
+
+data(mvad)
+
+```
+
+# 1. Create the state of the sequence and labels
+
+```{r}
+mvad.lab <- c("employment", "further education", "higher education",
+                    "joblessness", "school", "training")
+mvad.shortlab <- c("EM","FE","HE","JL","SC","TR")
+
+```
+
+# 2. Define the sequences and attach the labels
+
+```{r}
+mvad.seq <- seqdef(mvad, 17:86, states = mvad.shortlab, labels = mvad.lab, xtstep = 6)#the sequences are from column 17 to 86. 
+
+```
+
+# 3.Present the 10 first sequences
+
+```{r}
+#| warning: false
+#| message: false
+
+seqiplot(mvad.seq)
+```
+
+# 4.Present all sequences
+
+```{r}
+
+#| warning: false
+#| message: false
+seqIplot(mvad.seq)
+seqIplot(mvad.seq, group = mvad$gcse5eq)#present all sequences by stratified by another variable 
+
+```
+
+# 5. Most frequent sequence
+
+```{r}
+#| warning: false
+#| message: false
+seqfplot(mvad.seq)
+
+```
+
+# 6. Mean duration in each state
+
+```{r}
+#| warning: false
+#| message: false
+seqmtplot(mvad.seq)
+seqmtplot(mvad.seq, group = mvad$gcse5eq)
+
+```
+
+# 7. Distribution of the states at each time
+
+```{r}
+#| warning: false
+#| message: false
+seqdplot(mvad.seq)
+seqdplot(mvad.seq, group = mvad$gcse5eq)
+
+```
+
+# 8.built a matrice of distance on the sequences
+
+```{r}
+#| warning: false
+#| message: false
+ 
+hamdist <- seqdist(mvad.seq, method="HAM")#using the hamming distance
+hamdist[1:10,1:10]
+
+OMdist <- seqdist(mvad.seq, method="OM", indel = 1, sm = 'TRATE' )#using the OM distance
+
+
+OMdist[1:10,1:10]
+
+
+```
+
+# 9. Building a clustering on matrix distance
+
+```{r}
+hamclusterward <- agnes(hamdist, diss = TRUE, method="ward")  #agnes is a function running an agglomerative hierarchical clustering of the dataset.The ward criteria is selected.
+
+```
+
+# 10. Building the dendrogram and choosing the number of clusters
+
+```{r}
+
+#| warning: false
+#| message: false
+plot(hamclusterward, ask = FALSE, which.plots = 2)
+
+mvad.cl4 <- cutree(hamclusterward, k=6)#cut the tree in 4
+```
+
+# 11. Interpreting the clusters
+
+```{r}
+
+#| warning: false
+#| message: false
+seqdplot(mvad.seq, group=mvad.cl4)
+
+```
